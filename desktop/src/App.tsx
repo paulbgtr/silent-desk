@@ -15,11 +15,12 @@ function App() {
     const socket = new WebSocket("ws://localhost:9002");
 
     socket.onopen = () => {
-      console.log("✅ WebSocket открыт");
+      console.log("✅ WebSocket is open");
+      socket.send(JSON.stringify({ state: "working" }));
     };
 
     socket.onmessage = (event) => {
-      console.log("📥 Получено:", event.data);
+      console.log("📥 Received:", event.data);
       try {
         const data = JSON.parse(event.data);
 
@@ -40,12 +41,12 @@ function App() {
           }
         }
       } catch (e) {
-        console.warn("Ошибка парсинга WebSocket-сообщения", e);
+        console.warn("Error parsing WebSocket message", e);
       }
     };
 
     return () => socket.close();
-  }, [status, sessionStartTime]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
