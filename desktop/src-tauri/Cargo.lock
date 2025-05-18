@@ -712,6 +712,7 @@ name = "desktop"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "once_cell",
  "serde",
  "serde_json",
  "tauri",
