@@ -2,9 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use futures_util::{SinkExt, StreamExt};
-use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
-use tokio_tungstenite::{accept_async, tungstenite::protocol::Message};
+use tokio_tungstenite::accept_async;
 
 #[tauri::command]
 async fn start_websocket_server() -> Result<(), String> {
@@ -43,6 +42,4 @@ fn main() {
         .invoke_handler(tauri::generate_handler![start_websocket_server])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-
-    Ok(())
 }
