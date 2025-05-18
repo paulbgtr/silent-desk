@@ -1,62 +1,72 @@
 #include <WiFi.h>
-#include <HTTPClient.h>
+#include <WebSocketsClient.h>
 
-const char* ssid = "";
-const char* password = "";
-const char* serverUrl = "http://192.168.1.137:3001/api/presence";
+const char *ssid = "";
+const char *password = "";
 
-const int PIR_PIN = 27;
+WebSocketsClient webSocket;
 
-unsigned long lastMotion = 0;
-unsigned long idleTimeout = 5 * 60 * 1000; // 5 minutes
-bool isWorking = false;
+void setup()
+{
+    Serial.begin(115200);
 
-void setup() {
-  Serial.begin(115200);
-  pinMode(PIR_PIN, INPUT);
-
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("\nWiFi connected!");
-}
-
-void loop() {
-  int motion = digitalRead(PIR_PIN);
-  unsigned long now = millis();
-
-  if (motion == HIGH) {
-    lastMotion = now;
-
-    if (!isWorking) {
-      sendState("working");
-      isWorking = true;
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+        Serial.print(".");
     }
-  }
+    Serial.println("WiFi connected");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
 
-  if (isWorking && (now - lastMotion > idleTimeout)) {
-    sendState("idle");
-    isWorking = false;
-  }
+    webSocket.begin("192.168.1.144", 9002, "/");
 
-  delay(200);
+    webSocket.onEvent([](WStype_t type, uint8_t *payload, size_t length)
+                      {
+    if (type == WStype_CONNECTED) {
+      Serial.println("WebSocket connected");
+      webSocket.sendTXT("{\"state\":\"idle\"}");
+    } else if (type == WStype_DISCONNECTED) {
+      Serial.println("WebSocket disconnected");
+    } else if (type == WStype_ERROR) {
+      Serial.println("WebSocket error");
+    } });
+
+    webSocket.setReconnectInterval(5000);
 }
 
-void sendState(String state) {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.begin(serverUrl);
-    http.addHeader("Content-Type", "application/json");
+void loop()
+{
+    webSocket.loop();
 
-    String json = "{\"state\":\"" + state + "\"}";
-    int code = http.POST(json);
-    Serial.println("Sent: " + json + " | Code: " + code);
+    unsigned long currentTime = millis();
 
-    http.end();
-  } else {
-    Serial.println("No Wi-Fi");
-  }
+    static unsigned long lastSend = 0;
+    static unsigned long workingStateStartTime = 0;
+    static bool isWorking = false;
+    const unsigned long sendInterval = 15000;
+    const unsigned long workingDuration = 10000;
+
+    if (!isWorking && (currentTime - lastSend > sendInterval))
+    {
+        lastSend = currentTime;
+        Serial.println("Sending 'working' state");
+        if (WiFi.status() == WL_CONNECTED && webSocket.isConnected())
+        {
+            webSocket.sendTXT("{\"state\":\"working\"}");
+        }
+        isWorking = true;
+        workingStateStartTime = currentTime;
+    }
+
+    if (isWorking && (currentTime - workingStateStartTime > workingDuration))
+    {
+        Serial.println("Sending 'idle' state");
+        if (WiFi.status() == WL_CONNECTED && webSocket.isConnected())
+        {
+            webSocket.sendTXT("{\"state\":\"idle\"}");
+        }
+        isWorking = false;
+    }
 }
